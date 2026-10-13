@@ -81,7 +81,7 @@ FROM (
 ) AS Issues;
 GO
 
-
+select * from Gold.DimIssue
 /*========================================================
   3. DIM CUSTOMER
 ========================================================*/
@@ -118,7 +118,16 @@ FROM (
 ) AS Customers;
 GO
 
-
+SELECT
+    COUNT_BIG(*) AS TotalRows,
+    COUNT_BIG(*) - COUNT(CustomerName) AS NullCustomerName,
+    COUNT_BIG(*) - COUNT(CustomerEmail) AS NullCustomerEmail,
+    COUNT_BIG(*) - COUNT(CustomerAge) AS NullCustomerAge,
+    COUNT_BIG(*) - COUNT(CustomerGender) AS NullCustomerGender,
+    COUNT_BIG(*) - COUNT(SubscriptionType) AS NullSubscriptionType,
+    COUNT_BIG(*) - COUNT(CustomerTenureMonths) AS NullCustomerTenureMonths,
+    COUNT_BIG(*) - COUNT(CustomerSegment) AS NullCustomerSegment
+FROM Gold.DimCustomer;
 /*========================================================
   4. DIM TICKET CONTEXT
 ========================================================*/
@@ -141,32 +150,34 @@ FROM (
     FROM Silver.SupportTicket
 ) AS TicketContexts;
 GO
-
-
 /*========================================================
   5. DIM STAFF
 ========================================================*/
-
 CREATE OR ALTER VIEW Gold.DimStaff AS
 WITH StaffMembers AS (
-    SELECT DISTINCT
+    SELECT
         assigned_team AS AssignedTeam,
         assigned_to AS Member
     FROM Silver.SupportTicket
-
-    UNION
-
-    SELECT DISTINCT
-        CAST(NULL AS NVARCHAR(MAX)) AS AssignedTeam,
-        resolved_by AS Member
-    FROM Silver.SupportTicket
-    WHERE resolved_by IS NOT NULL
+    WHERE assigned_to IS NOT NULL
 
     UNION
 
     SELECT
-        CAST(NULL AS NVARCHAR(MAX)),
-        CAST(NULL AS NVARCHAR(MAX))
+        assigned_team AS AssignedTeam,
+        resolved_by AS Member
+    FROM Silver.SupportTicket
+    WHERE resolved_by IS NOT NULL
+),
+UniqueStaff AS (
+    SELECT
+        AssignedTeam,
+        Member,
+        ROW_NUMBER() OVER (
+            PARTITION BY Member
+            ORDER BY AssignedTeam
+        ) AS rn
+    FROM StaffMembers
 )
 SELECT
     ROW_NUMBER() OVER (
@@ -174,9 +185,21 @@ SELECT
     ) AS StaffKey,
     AssignedTeam,
     Member
-FROM StaffMembers;
-GO
+FROM UniqueStaff
+WHERE rn = 1
 
+UNION ALL
+
+SELECT
+    1 AS StaffKey,
+    CAST(NULL AS NVARCHAR(MAX)) AS AssignedTeam,
+    CAST(NULL AS NVARCHAR(MAX)) AS Member
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM UniqueStaff
+    WHERE Member IS NULL
+);
+GO
 
 /*========================================================
   6. DIM TICKET STATE
@@ -197,7 +220,7 @@ FROM (
 ) AS TicketStates;
 GO
 
-
+select * from Gold.DimTicketState
 /*========================================================
   7. DIM TICKET FLAGS
 ========================================================*/
@@ -217,7 +240,7 @@ FROM (
 ) AS TicketFlags;
 GO
 
-
+select * from  Gold.DimTicketFlags
 /*========================================================
   8. FACT TICKETS
 ========================================================*/
@@ -629,37 +652,51 @@ GO
 /*========================================================
   5. DIM STAFF
 ========================================================*/
-
 CREATE OR ALTER VIEW Gold.DimStaff AS
+
 WITH StaffMembers AS (
-    SELECT DISTINCT
+
+    SELECT
         assigned_team AS AssignedTeam,
         assigned_to AS Member
     FROM Silver.SupportTicket
-
-    UNION
-
-    SELECT DISTINCT
-        CAST(NULL AS NVARCHAR(MAX)) AS AssignedTeam,
-        resolved_by AS Member
-    FROM Silver.SupportTicket
-    WHERE resolved_by IS NOT NULL
+    WHERE assigned_to IS NOT NULL
+      AND assigned_to <> N'Not Resolved Yet'
 
     UNION
 
     SELECT
-        CAST(NULL AS NVARCHAR(MAX)),
-        CAST(NULL AS NVARCHAR(MAX))
+        assigned_team AS AssignedTeam,
+        resolved_by AS Member
+    FROM Silver.SupportTicket
+    WHERE resolved_by IS NOT NULL
+      AND resolved_by <> N'Not Resolved Yet'
+),
+
+FinalStaff AS (
+
+    SELECT
+        AssignedTeam,
+        Member
+    FROM StaffMembers
+
+    UNION
+
+    SELECT
+        CAST(N'No Team' AS NVARCHAR(MAX)) AS AssignedTeam,
+        CAST(N'Not Resolved Yet' AS NVARCHAR(MAX)) AS Member
 )
+
 SELECT
     ROW_NUMBER() OVER (
         ORDER BY AssignedTeam, Member
     ) AS StaffKey,
     AssignedTeam,
     Member
-FROM StaffMembers;
+FROM FinalStaff;
 GO
 
+select * from Gold.DimStaff
 
 /*========================================================
   6. DIM TICKET STATE
@@ -699,6 +736,8 @@ FROM (
     FROM Silver.SupportTicket
 ) AS TicketFlags;
 GO
+
+select * from Gold.DimTicketFlags
 
 /*========================================================
   8. FACT TICKETS
@@ -976,14 +1015,3 @@ SELECT
     *
 FROM TicketData;
 GO
-
-
-
-SELECT
-    TABLE_SCHEMA,
-    TABLE_NAME
-FROM INFORMATION_SCHEMA.VIEWS
-WHERE TABLE_SCHEMA = 'Gold'
-ORDER BY TABLE_NAME;
-
-select count(*) from Gold.FactTickets
