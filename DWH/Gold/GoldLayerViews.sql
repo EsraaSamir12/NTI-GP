@@ -756,26 +756,17 @@ WITH TicketData AS (
 
         AssignedStaff.StaffKey AS AssignedAtKey,
 
-        COALESCE(
-            ResolvedStaff.StaffKey,
-            UnknownStaff.StaffKey
-        ) AS ResolvedByKey,
+        ResolvedStaff.StaffKey AS ResolvedByKey,
 
         TS.TicketStateKey,
 
-        COALESCE(CreatedDate.DateKey, 0) AS CreatedAtKey,
+        CreatedDate.DateKey AS CreatedAtKey,
 
-        COALESCE(
-            FirstResolvedDate.DateKey, 0
-        ) AS FirstResolvedAtKey,
+        FirstResolvedDate.DateKey AS FirstResolvedAtKey,
 
-        COALESCE(
-            ResolvedDate.DateKey, 0
-        ) AS ResolvedAtKey,
+        ResolvedDate.DateKey AS ResolvedAtKey,
 
-        COALESCE(
-            ClosedDate.DateKey, 0
-        ) AS ClosedAtKey,
+        ClosedDate.DateKey AS ClosedAtKey,
 
         CAST(
             ROUND(S.sla_target_minutes / 60.0, 0)
@@ -815,6 +806,7 @@ WITH TicketData AS (
         ) AS FirstResponseTimeMinutes,
 
         S.reopen_count AS ReopenCount,
+
         S.escalation_reason AS EscalationReason,
 
         CAST(
@@ -962,16 +954,7 @@ WITH TicketData AS (
 
     /* Resolved By Staff */
     LEFT JOIN Gold.DimStaff ResolvedStaff
-        ON ResolvedStaff.AssignedTeam IS NULL
-       AND ResolvedStaff.Member = S.resolved_by
-
-    /* Unknown Staff */
-    CROSS JOIN (
-        SELECT StaffKey
-        FROM Gold.DimStaff
-        WHERE AssignedTeam IS NULL
-          AND Member IS NULL
-    ) UnknownStaff
+        ON ResolvedStaff.Member = S.resolved_by
 
     /* Ticket State */
     INNER JOIN Gold.DimTicketState TS
