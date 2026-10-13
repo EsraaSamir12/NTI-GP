@@ -69,7 +69,7 @@ BEGIN
             CASE
                 WHEN calc.sla_breach_margin_minutes < 0 THEN 'Yes'
                 WHEN calc.sla_breach_margin_minutes > 0 THEN 'No'
-                ELSE NULL
+                ELSE 'Pending'
             END,
 
             calc.sla_breach_margin_minutes,
