@@ -8,21 +8,46 @@ GROUP BY ticket_id
 HAVING COUNT(*) > 1;
 
 -- check missing values for each row 
-DECLARE @SQL NVARCHAR(MAX) = '';
-
-SELECT @SQL = @SQL +
-    CASE WHEN @SQL = '' THEN '' ELSE ' UNION ALL ' END +
-    'SELECT ''' + COLUMN_NAME + ''' AS ColumnName, ' +
-    'COUNT(*) AS NullCount ' +
-    'FROM Bronze.SupportTicket ' +
-    'WHERE [' + COLUMN_NAME + '] IS NULL'
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = 'Bronze'
-  AND TABLE_NAME = 'SupportTicket';
-
-SET @SQL = @SQL + ' ORDER BY NullCount DESC;';
-
-EXEC sp_executesql @SQL;
+SELECT
+    COUNT(*) - COUNT(ticket_id) AS ticket_id_Nulls,
+    COUNT(*) - COUNT(created_at) AS created_at_Nulls,
+    COUNT(*) - COUNT(issue_description) AS issue_description_Nulls,
+    COUNT(*) - COUNT(category) AS category_Nulls,
+    COUNT(*) - COUNT(issue_type_id) AS issue_type_id_Nulls,
+    COUNT(*) - COUNT(product) AS product_Nulls,
+    COUNT(*) - COUNT(channel) AS channel_Nulls,
+    COUNT(*) - COUNT(region) AS region_Nulls,
+    COUNT(*) - COUNT(language) AS language_Nulls,
+    COUNT(*) - COUNT(customer_name) AS customer_name_Nulls,
+    COUNT(*) - COUNT(customer_email) AS customer_email_Nulls,
+    COUNT(*) - COUNT(customer_age) AS customer_age_Nulls,
+    COUNT(*) - COUNT(customer_gender) AS customer_gender_Nulls,
+    COUNT(*) - COUNT(subscription_type) AS subscription_type_Nulls,
+    COUNT(*) - COUNT(customer_tenure_months) AS customer_tenure_months_Nulls,
+    COUNT(*) - COUNT(previous_tickets) AS previous_tickets_Nulls,
+    COUNT(*) - COUNT(customer_segment) AS customer_segment_Nulls,
+    COUNT(*) - COUNT(priority) AS priority_Nulls,
+    COUNT(*) - COUNT(issue_complexity_score) AS issue_complexity_score_Nulls,
+    COUNT(*) - COUNT(assigned_team) AS assigned_team_Nulls,
+    COUNT(*) - COUNT(assigned_to) AS assigned_to_Nulls,
+    COUNT(*) - COUNT(status) AS status_Nulls,
+    COUNT(*) - COUNT(escalated) AS escalated_Nulls,
+    COUNT(*) - COUNT(escalation_reason) AS escalation_reason_Nulls,
+    COUNT(*) - COUNT(reopen_count) AS reopen_count_Nulls,
+    COUNT(*) - COUNT(first_response_time_hours) AS first_response_time_hours_Nulls,
+    COUNT(*) - COUNT(resolution_time_hours) AS resolution_time_hours_Nulls,
+    COUNT(*) - COUNT(paused_hours) AS paused_hours_Nulls,
+    COUNT(*) - COUNT(resolution_wallclock_hours) AS resolution_wallclock_hours_Nulls,
+    COUNT(*) - COUNT(first_resolved_at) AS first_resolved_at_Nulls,
+    COUNT(*) - COUNT(resolved_at) AS resolved_at_Nulls,
+    COUNT(*) - COUNT(closed_at) AS closed_at_Nulls,
+    COUNT(*) - COUNT(resolved_by) AS resolved_by_Nulls,
+    COUNT(*) - COUNT(resolution_notes) AS resolution_notes_Nulls,
+    COUNT(*) - COUNT(sla_target_hours) AS sla_target_hours_Nulls,
+    COUNT(*) - COUNT(sla_breached) AS sla_breached_Nulls,
+    COUNT(*) - COUNT(sla_breach_margin) AS sla_breach_margin_Nulls,
+    COUNT(*) - COUNT(customer_satisfaction_score) AS customer_satisfaction_score_Nulls
+FROM Bronze.SupportTicket;
 
 
 
@@ -60,7 +85,7 @@ FROM Bronze.SupportTicket;
 SELECT DISTINCT escalated
 FROM Bronze.SupportTicket;
 
-SELECT DISTINCT gender
+SELECT DISTINCT customer_gender
 FROM Bronze.SupportTicket;
 
 
@@ -84,10 +109,10 @@ SELECT
 
     MIN(first_response_time_hours) AS min_first_response,
     MAX(first_response_time_hours) AS max_first_response,
-
+    -------------------------------------------------------
     MIN(resolution_time_hours) AS min_resolution_time,
     MAX(resolution_time_hours) AS max_resolution_time,
-
+    -------------------------------------------------------
     MIN(paused_hours) AS min_paused_hours,
     MAX(paused_hours) AS max_paused_hours,
 
@@ -97,7 +122,7 @@ SELECT
 FROM Bronze.SupportTicket;
 
 ---------------------------------------------------------------
-
+-- Validate resolution_wallclock_hours by identifying missing values or differences greater than 1 hour compared to the calculated duration.
 WITH Comparison AS (
     SELECT
         ticket_id,
@@ -107,13 +132,13 @@ WITH Comparison AS (
 
         DATEDIFF(
             SECOND,
-            TRY_CONVERT(DATETIME, created_at),
-            TRY_CONVERT(DATETIME, resolved_at)
+            created_at,
+            resolved_at
         ) / 3600.0 AS calculated_hours
 
     FROM Bronze.SupportTicket
-    WHERE TRY_CONVERT(DATETIME, created_at) IS NOT NULL
-      AND TRY_CONVERT(DATETIME, resolved_at) IS NOT NULL
+    WHERE created_at IS NOT NULL
+      AND resolved_at IS NOT NULL
 )
 SELECT
     *,
@@ -124,22 +149,44 @@ WHERE original_hours IS NULL
 
 
 -------------------------------------------------------
-
+-- Count tickets where the resolution timestamp is earlier than the creation timestamp.
 SELECT COUNT(*) AS resolved_before_created
 FROM Bronze.SupportTicket
-WHERE TRY_CONVERT(DATETIME, created_at) IS NOT NULL
-  AND TRY_CONVERT(DATETIME, resolved_at) IS NOT NULL
-  AND TRY_CONVERT(DATETIME, resolved_at)
-      < TRY_CONVERT(DATETIME, created_at);
+WHERE  created_at IS NOT NULL
+  AND  resolved_at IS NOT NULL
+  AND  resolved_at
+      < created_at;
 
----------------------------------------------------------
-SELECT
-    ticket_id,
-    created_at,
-    first_resolved_at,
-    resolved_at
+--------------------------------------------------------------------
+-- Identify tickets where first_resolved_at is later than resolved_at.
+SELECT count(*)
 FROM Bronze.SupportTicket
-WHERE TRY_CONVERT(DATETIME, first_resolved_at) IS NOT NULL
-  AND TRY_CONVERT(DATETIME, resolved_at) IS NOT NULL
-  AND TRY_CONVERT(DATETIME, first_resolved_at)
-      > TRY_CONVERT(DATETIME, resolved_at);
+WHERE first_resolved_at IS NOT NULL
+  AND resolved_at IS NOT NULL
+  AND first_resolved_at
+      > resolved_at;
+-----------------------------------------------------------------------
+-- Tickets that exceeded the SLA target but are marked as not breached.
+SELECT COUNT(*) AS SLA_Inconsistency_Count
+FROM Bronze.SupportTicket
+WHERE created_at IS NOT NULL
+  AND resolved_at IS NOT NULL
+  AND DATEDIFF(
+        SECOND,
+        created_at,
+        resolved_at
+      ) / 3600.0 > sla_target_hours
+  AND sla_breached = 'No';
+
+
+-- Tickets resolved within the SLA target but marked as breached.  
+SELECT COUNT(*) AS SLA_Inconsistency_Count
+FROM Bronze.SupportTicket
+WHERE created_at IS NOT NULL
+  AND resolved_at IS NOT NULL
+  AND DATEDIFF(
+        SECOND,
+        created_at,
+        resolved_at
+      ) / 3600.0 < sla_target_hours
+  AND sla_breached = 'Yes';
