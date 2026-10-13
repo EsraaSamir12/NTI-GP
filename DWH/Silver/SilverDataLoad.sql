@@ -61,7 +61,10 @@ BEGIN
             dates.latest_date,
 
             b.closed_at,
-            b.resolved_by,
+            CASE
+            WHEN b.resolved_by IS NULL THEN 'Not Resolved Yet'
+                 ELSE b.resolved_by
+            END AS resolved_by,
             b.resolution_notes,
 
             b.sla_target_hours * 60.0,
