@@ -103,12 +103,12 @@ The analysis is organized into six stages:
 
 | Model | Task | Key Metric |
 |---|---|---|
-| Linear Regression | SLA breach margin | _R² = …_ |
-| Random Forest Regressor | SLA breach margin | _R² = …_ |
-| Logistic Regression | SLA breach (final model) | _F1 = …, ROC-AUC = …_ |
-| Random Forest Classifier | SLA breach | _F1 = …, ROC-AUC = …_ |
-| Logistic Regression | Priority | _Macro F1 = …_ |
-| Random Forest | Priority | _Macro F1 = …_ |
+| Linear Regression | SLA breach margin | _R² = 21%_ |
+| Random Forest Regressor | SLA breach margin | _R² = 22%_ |
+| Logistic Regression | SLA breach (final model) | _F1 = 75%, ROC-AUC = 86%_ |
+| Random Forest Classifier | SLA breach | _F1 = 75%, ROC-AUC = 86%_ |
+| Logistic Regression | Priority | _Macro F1 = 36%_ |
+| Random Forest | Priority | _Macro F1 = 37%_ |
 
 ## 🚀 Getting Started
 
