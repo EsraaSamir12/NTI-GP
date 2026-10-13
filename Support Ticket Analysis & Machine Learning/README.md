@@ -110,10 +110,6 @@ The analysis is organized into six stages:
 | Logistic Regression | Priority | _Macro F1 = …_ |
 | Random Forest | Priority | _Macro F1 = …_ |
 
-## 💡 Recommendations
-
-> _Summarize 3–5 actionable recommendations based on your findings (e.g., staffing for high-risk categories, early-warning for tickets likely to breach SLA, improving first-response time)._
-
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -122,13 +118,6 @@ The analysis is organized into six stages:
 - Microsoft SQL Server access
 - [ODBC Driver 18 for SQL Server](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server)
 
-### Installation
-
-```bash
-git clone https://github.com/<your-username>/<your-repo-name>.git
-cd <your-repo-name>
-pip install pandas numpy matplotlib seaborn scikit-learn pyodbc sqlalchemy jupyter
-```
 
 ### Configuration
 
@@ -156,11 +145,4 @@ Then open the notebook and run the cells in order. (The `.py` file is the notebo
 └── README.md
 ```
 
-## 👤 Author
 
-**Your Name**
-[LinkedIn](https://www.linkedin.com/in/your-profile) · [GitHub](https://github.com/your-username)
-
-## 📄 License
-
-This project is licensed under the MIT License — see the `LICENSE` file for details.
