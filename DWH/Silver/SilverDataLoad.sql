@@ -70,7 +70,7 @@ BEGIN
             b.sla_target_hours * 60.0,
 
             CASE
-                WHEN calc.sla_breach_margin_minutes < 0 THEN 'Yes'
+                WHEN calc.sla_breach_margin_minutes <= 0 THEN 'Yes'
                 WHEN calc.sla_breach_margin_minutes > 0 THEN 'No'
                 ELSE 'Pending'
             END,
