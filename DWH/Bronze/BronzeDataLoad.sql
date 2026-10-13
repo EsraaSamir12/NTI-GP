@@ -24,11 +24,11 @@ BEGIN
         FROM 'D:\NTI GP\tickets.csv'
         WITH
         (
-            FORMAT = 'CSV',
-            FIRSTROW = 2,
-            FIELDQUOTE = '"',
-            CODEPAGE = '65001',
-            TABLOCK
+             FIRSTROW = 2, 
+             FIELDTERMINATOR = ',', 
+             ROWTERMINATOR = '\n',  
+             CODEPAGE = '65001',    
+             TABLOCK
         );
 
         SET @End_Time = GETDATE();
