@@ -1,4 +1,3 @@
-
 CREATE OR ALTER PROCEDURE Silver.silver_Load
 AS
 BEGIN
@@ -28,77 +27,93 @@ BEGIN
             sla_breach_margin_minutes, customer_satisfaction_score
         )
         SELECT
-            ticket_id,
+            b.ticket_id,
 
-            -- Correct created_at
             CASE
-                WHEN resolved_at < created_at THEN resolved_at
-                ELSE created_at
+                WHEN b.resolved_at < b.created_at THEN b.resolved_at
+                ELSE b.created_at
             END,
 
-            issue_description, category, issue_type_id, product,
-            channel, region, language, customer_name, customer_email,
-            customer_age, customer_gender, subscription_type,
-            customer_tenure_months, previous_tickets, customer_segment,
-            priority, issue_complexity_score, assigned_team, assigned_to,
-            status,
+            b.issue_description, b.category, b.issue_type_id,
+            b.product, b.channel, b.region, b.language,
+            b.customer_name, b.customer_email, b.customer_age,
+            b.customer_gender, b.subscription_type,
+            b.customer_tenure_months, b.previous_tickets,
+            b.customer_segment, b.priority, b.issue_complexity_score,
+            b.assigned_team, b.assigned_to, b.status,
 
-            COALESCE(escalated, N'Unknown'),
-            COALESCE(escalation_reason, N'Unknown'),
+            COALESCE(b.escalated, N'Unknown'),
+            COALESCE(b.escalation_reason, N'Unknown'),
 
-            reopen_count,
+            b.reopen_count,
+            b.first_response_time_hours * 60.0,
+            ABS(b.resolution_time_hours) * 60.0,
+            b.paused_hours * 60.0,
 
-            first_response_time_hours * 60.0,
-            ABS(resolution_time_hours) * 60.0,
-            paused_hours * 60.0,
+            calc.resolution_wallclock_minutes,
 
-            -- Calculate wall-clock minutes after correcting dates
             CASE
-                WHEN created_at IS NULL OR resolved_at IS NULL
+                WHEN b.first_resolved_at > dates.latest_date
+                THEN dates.earliest_date
+                ELSE b.first_resolved_at
+            END,
+
+            dates.latest_date,
+
+            b.closed_at,
+            b.resolved_by,
+            b.resolution_notes,
+
+            b.sla_target_hours * 60.0,
+
+            CASE
+                WHEN calc.sla_breach_margin_minutes < 0 THEN 'Yes'
+                WHEN calc.sla_breach_margin_minutes > 0 THEN 'No'
+                ELSE NULL
+            END,
+
+            calc.sla_breach_margin_minutes,
+
+            b.customer_satisfaction_score
+
+        FROM Bronze.SupportTicket b
+
+        CROSS APPLY (
+            SELECT
+                CASE
+                    WHEN b.resolved_at < b.created_at THEN b.resolved_at
+                    ELSE b.created_at
+                END AS earliest_date,
+
+                CASE
+                    WHEN b.resolved_at < b.created_at THEN b.created_at
+                    ELSE b.resolved_at
+                END AS latest_date
+        ) dates
+
+        CROSS APPLY (
+            SELECT
+                CASE
+                    WHEN b.created_at IS NULL OR b.resolved_at IS NULL
                     THEN NULL
-                ELSE ABS(
-                    DATEDIFF_BIG(SECOND, created_at, resolved_at)
-                ) / 60.0
-            END,
+                    ELSE ABS(
+                        DATEDIFF_BIG(SECOND, dates.earliest_date, dates.latest_date)
+                    ) / 60.0
+                END AS resolution_wallclock_minutes
+        ) wallclock
 
-            -- Correct first_resolved_at
-            CASE
-                WHEN first_resolved_at >
-                    CASE
-                        WHEN resolved_at < created_at THEN created_at
-                        ELSE resolved_at
-                    END
-                THEN
-                    CASE
-                        WHEN resolved_at < created_at THEN resolved_at
-                        ELSE created_at
-                    END
-                ELSE first_resolved_at
-            END,
-
-            -- Correct resolved_at
-            CASE
-                WHEN first_resolved_at >
-                    CASE
-                        WHEN resolved_at < created_at THEN created_at
-                        ELSE resolved_at
-                    END
-                THEN first_resolved_at
-                WHEN resolved_at < created_at THEN created_at
-                ELSE resolved_at
-            END,
-
-            closed_at,
-            resolved_by,
-            resolution_notes,
-
-            sla_target_hours * 60.0,
-            sla_breached,
-            sla_breach_margin * 60.0,
-
-            customer_satisfaction_score
-
-        FROM Bronze.SupportTicket;
+        CROSS APPLY (
+            SELECT
+                wallclock.resolution_wallclock_minutes,
+                CASE
+                    WHEN b.resolved_at IS NULL
+                         OR b.sla_target_hours IS NULL
+                         OR wallclock.resolution_wallclock_minutes IS NULL
+                    THEN NULL
+                    ELSE (b.sla_target_hours * 60.0)
+                         - wallclock.resolution_wallclock_minutes
+                END AS sla_breach_margin_minutes
+        ) calc;
 
         COMMIT TRANSACTION;
 
@@ -106,28 +121,21 @@ BEGIN
 
     END TRY
     BEGIN CATCH
-
         IF @@TRANCOUNT > 0
             ROLLBACK TRANSACTION;
 
         PRINT '>> ERROR: ' + ERROR_MESSAGE();
-
         THROW;
     END CATCH
 END;
 GO
 
--- Execute the procedure
 EXEC Silver.silver_Load;
 GO
 
--- Check row counts
 SELECT
     (SELECT COUNT(*) FROM Bronze.SupportTicket) AS BronzeRows,
     (SELECT COUNT(*) FROM Silver.SupportTicket) AS SilverRows;
 GO
-
-
-----------------------------------------------------------------------------
 
 
