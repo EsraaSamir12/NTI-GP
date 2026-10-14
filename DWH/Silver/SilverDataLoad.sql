@@ -54,23 +54,20 @@ BEGIN
 
             CASE
                 WHEN b.first_resolved_at > dates.latest_date
-                THEN dates.earliest_date
+                THEN dates.latest_date
                 ELSE b.first_resolved_at
             END,
 
             dates.latest_date,
 
             b.closed_at,
-            CASE
-            WHEN b.resolved_by IS NULL THEN 'Not Resolved Yet'
-                 ELSE b.resolved_by
-            END AS resolved_by,
+            b.resolved_by,
             b.resolution_notes,
 
             b.sla_target_hours * 60.0,
 
             CASE
-                WHEN calc.sla_breach_margin_minutes <= 0 THEN 'Yes'
+                WHEN calc.sla_breach_margin_minutes < 0 THEN 'Yes'
                 WHEN calc.sla_breach_margin_minutes > 0 THEN 'No'
                 ELSE 'Pending'
             END,
@@ -142,3 +139,4 @@ SELECT
 GO
 
 
+-----------------------------------------------------------------------
